@@ -91,7 +91,7 @@ class Engine {
     const T = THREE, s = this.scene;
     s.add(new T.HemisphereLight(0xcfe0ff, 0x1a2a1a, 0.62));
     const d = new T.DirectionalLight(0xffffff, 0.75); d.position.set(-10, 30, 14); d.castShadow = true;
-    const mp = (window.innerWidth < 900 ? 1024 : 2048); d.shadow.mapSize.set(mp, mp); const sc = d.shadow.camera; sc.left = -38; sc.right = 38; sc.top = 24; sc.bottom = -24; sc.near = 5; sc.far = 80; d.shadow.bias = -0.0006; s.add(d);
+    const mp = (window.innerWidth < 900 ? 1024 : 2048); d.shadow.mapSize.set(mp, mp); const sc = d.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 28; sc.bottom = -28; sc.near = 5; sc.far = 100; d.shadow.bias = -0.0006; s.add(d);
     const d2 = new T.DirectionalLight(0xaaccff, 0.2); d2.position.set(14, 20, -16); s.add(d2);
   }
   buildArena() {
@@ -418,7 +418,7 @@ class Engine {
     for (const pm of this.pm) {
       const P = pm.P, g = pm.g, on = P.on; g.visible = on; if (!on) continue;
       g.position.set(P.x, 0, P.z); const ty = Math.atan2(P.fx, P.fz); let dy = ty - g.rotation.y; while (dy > Math.PI) dy -= 6.2832; while (dy < -Math.PI) dy += 6.2832; g.rotation.y += dy * Math.min(1, dt * 14);
-      const sp = hyp(P.vx, P.vz), run = clamp(sp / 5.5, 0, 1.3), ph = P.anim * 2.3;
+      const sp = hyp(P.vx, P.vz), run = clamp(sp / 5.5, 0, 1.3), ph = P.anim * 1.9;
       let l0 = Math.sin(ph) * run * 0.85, l1 = -l0, a0 = -l0 * 0.8, a1 = -a0, by = 0, bx = 0, bz = 0, bounce = Math.abs(Math.sin(ph)) * run * 0.05, eb = -(0.3 + run * 0.7);
       let k0 = clamp(l0 * 1.4, 0, 1.5) + run * 0.1, k1 = clamp(l1 * 1.4, 0, 1.5) + run * 0.1;
       if (P.kickT > 0) { l0 = -1.2 * Math.min(1, P.kickT / 0.2); k0 = 0.15; a0 = 0.6; }
@@ -429,8 +429,9 @@ class Engine {
       if (P.celeb > 0) { a0 = a1 = Math.PI * 0.85 + Math.sin(this.time * 14) * 0.3; eb = 0; bounce = Math.abs(Math.sin(this.time * 9)) * 0.4; l0 = l1 = 0; k0 = k1 = 0.1; }
       if (P.isGK && !(P.diveT > 0) && !(P.celeb > 0)) { const ready = Math.sin(this.time * 5 + P.id) * 0.1; a0 = -0.5 + ready; a1 = -0.5 - ready; eb = -0.7; k0 = k1 = 0.35; l0 = l1 = -0.1; by = -0.05; }
       if (P.stun > 0) { bx = 0.2; }
-      pm.legs[0].rotation.x = l0; pm.legs[1].rotation.x = l1; pm.knees[0].rotation.x = k0; pm.knees[1].rotation.x = k1;
-      pm.arms[0].rotation.x = a0; pm.arms[1].rotation.x = a1; pm.arms[0].rotation.z = P.celeb > 0 ? 0.5 : 0.07; pm.arms[1].rotation.z = P.celeb > 0 ? -0.5 : -0.07;
+      const lk = Math.min(1, dt * 14), R = (o, v) => { o.rotation.x += (v - o.rotation.x) * lk; };
+      R(pm.legs[0], l0); R(pm.legs[1], l1); R(pm.knees[0], k0); R(pm.knees[1], k1);
+      R(pm.arms[0], a0); R(pm.arms[1], a1); pm.arms[0].rotation.z = P.celeb > 0 ? 0.5 : 0.07; pm.arms[1].rotation.z = P.celeb > 0 ? -0.5 : -0.07;
       pm.elbows[0].rotation.x = eb; pm.elbows[1].rotation.x = eb;
       pm.body.rotation.x = lerp(pm.body.rotation.x, bx || (run * 0.14), Math.min(1, dt * 16)); pm.body.rotation.z = lerp(pm.body.rotation.z, bz, Math.min(1, dt * 14));
       pm.body.position.y = lerp(pm.body.position.y, bounce + by, Math.min(1, dt * 20));
@@ -584,3 +585,5 @@ KL.genCode = () => { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; fo
 })();
 
 ;
+
+

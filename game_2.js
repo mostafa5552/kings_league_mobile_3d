@@ -8,7 +8,7 @@
 var KL = window.KL = window.KL || {};
 (function () {
 'use strict';
-const F = KL.F = { L: 60, W: 34, hx: 30, hz: 17, gw: 4, gh: 2.7, gd: 2.4, pad: 2.5, penD: 13, penW: 26, penSpot: 9, R: 0.24 };
+const F = KL.F = { L: 72, W: 40, hx: 36, hz: 20, gw: 4, gh: 2.7, gd: 2.4, pad: 2.5, penD: 15, penW: 30, penSpot: 10, R: 0.24 };
 const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rr = Math.random, hyp = Math.hypot, sgn = v => v < 0 ? -1 : 1;
@@ -64,7 +64,7 @@ class Match {
       const t = this.t[ti], P = k != null ? t.players[k] : null; if (!P || P.isGK) return;
       t.career = P; t.queue = [P].concat(t.queue.filter(q => q !== P));
     });
-    for (const t of this.t) { t.card = this.pickCard(); t.aiCardAt = [rnd(6, 15), rnd(24, 34)]; t.jokerHold = rr() < 0.6; }
+    for (const t of this.t) { t.card = this.pickCard(); t.aiCardAt = [rnd(6, 15), rnd(24, 34)]; /* بطاقة واحدة فقط لكل فريق في المباراة */ t.jokerHold = rr() < 0.6; }
     this.reconcile(); this.placeKickoff();
   }
   emit(type, d) { const e = Object.assign({ type }, d || {}); this.ev.push(e); if (this.ev.length > 60) this.ev.shift(); if (this.onEvent) this.onEvent(e); }
@@ -258,7 +258,6 @@ class Match {
     if (this.half === 1 && m >= 20) { this.endHalf(); return; }
     if (this.half === 2 && m >= 23 && !this.cards2) {
       this.cards2 = true;
-      for (const t of this.t) { if (!t.card) { t.card = this.pickCard(); if (this.hu(t.idx)) this.emit('newCard', { card: t.card, team: t.idx }); } }
       this.emit('banner', { text: '🃏 البطاقات السرية متاحة', sub: 'العودة الكاملة 7 ضد 7' });
     }
     if (this.half === 2 && !this.mb && m >= 36) { this.startMatchBall(); return; }
@@ -554,13 +553,19 @@ class Match {
     let dx = tx - P.x, dz = tz - P.z; const d = hyp(dx, dz); let vx = 0, vz = 0;
     if (d > 0.12 && sp > 0) { const s = Math.min(sp, d * 4.5); vx = dx / d * s; vz = dz / d * s; }
     if (P.tackleT > 0) return;
-    const k = Math.min(1, dt * 9); P.vx += (vx - P.vx) * k; P.vz += (vz - P.vz) * k;
+    const k = Math.min(1, dt * 5.5); P.vx += (vx - P.vx) * k; P.vz += (vz - P.vz) * k;
   }
   integrate(P, dt) {
     if (P.tackleT > 0) { const f = 0.35 + P.tackleT / 0.38; P.vx = P.tdx * 8.2 * f; P.vz = P.tdz * 8.2 * f; }
     P.x += P.vx * dt; P.z += P.vz * dt;
     const s = hyp(P.vx, P.vz);
-    if (s > 0.6) { const k = Math.min(1, dt * 12); P.fx += (P.vx / s - P.fx) * k; P.fz += (P.vz / s - P.fz) * k; const n = hyp(P.fx, P.fz) || 1; P.fx /= n; P.fz /= n; }
+    const bb = this.ball;
+    if (bb.owner !== P && !(P.tackleT > 0) && !P.celeb && this.mode !== 'goal' && (s < 3.4 || P.isGK)) {
+      // اللاعبون بلا كرة ينظرون نحو الكرة وهم يتمركزون
+      let tx = bb.x - P.x, tz = bb.z - P.z; const td = hyp(tx, tz) || 1; tx /= td; tz /= td;
+      if (s > 0.6) { const w = clamp((s - 0.6) / 2.8, 0, 1) * 0.55; tx = tx * (1 - w) + P.vx / s * w; tz = tz * (1 - w) + P.vz / s * w; }
+      const k = Math.min(1, dt * 6); P.fx += (tx - P.fx) * k; P.fz += (tz - P.fz) * k; const n = hyp(P.fx, P.fz) || 1; P.fx /= n; P.fz /= n;
+    } else if (s > 0.6) { const k = Math.min(1, dt * 9); P.fx += (P.vx / s - P.fx) * k; P.fz += (P.vz / s - P.fz) * k; const n = hyp(P.fx, P.fz) || 1; P.fx /= n; P.fz /= n; }
     P.anim += s * dt * 1.9;
     P.x = clamp(P.x, -(F.hx + 2.1), F.hx + 2.1); P.z = clamp(P.z, -(F.hz - 0.45), F.hz - 0.45);
     if (!P.isGK && Math.abs(P.x) > F.hx - 0.15 && Math.abs(P.z) < F.gw + 0.3) P.z = sgn(P.z) * (F.gw + 0.3);
@@ -635,7 +640,7 @@ class Match {
       }
       if (!b.net) for (const t of this.t) {
         const G = t.gk; if (!G.on || b.owner || G.saveCd > 0 || b.lastTeam === G.t || this.mode === 'goal') continue;
-        const rb = this.hu(G.t) ? 0.45 : 0, reach = (G.diveT > 0 ? 2.6 : 1.45) + rb, hgt = G.diveT > 0 ? 2.9 : 2.3;
+        const rb = this.hu(G.t) ? 0.2 : 0, reach = (G.diveT > 0 ? 2.6 : 1.45) + rb, hgt = G.diveT > 0 ? 2.9 : 2.3;
         if (Math.abs(b.x - G.x) < 0.9 && Math.abs(b.z - G.z) < reach && b.y < hgt && hyp(b.vx, b.vz) > 4) this.saveAttempt(G);
       }
       this.tryPickup();
@@ -815,3 +820,5 @@ KL.Match = Match;
 })();
 
 ;
+
+

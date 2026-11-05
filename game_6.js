@@ -1,4 +1,101 @@
 /* KING'S LEAGUE 3D — game_6.js (جزء 6 من 6) */
+/* ===== divisions.js ===== */
+/* ============================================================
+   KING'S LEAGUE 3D — divisions.js
+   بوابة الوضع الأفقي + نظام الدفيجنات الخمسة (مباريات مصنّفة)
+   ============================================================ */
+var KL = window.KL = window.KL || {};
+(function () {
+'use strict';
+KL.ui = KL.ui || {};
+/* إنشاء شاشة ديناميكية */
+KL.ui.screen = function (id, html) { let e = document.getElementById(id); if (!e) { e = document.createElement('div'); e.id = id; e.className = 'screen'; document.body.appendChild(e); } if (html != null) e.innerHTML = html; return e; };
+KL.ui.acts = KL.ui.acts || {};
+KL.ui.addHome = function (label, sub, cls, fn, key) { if (key) KL.ui.acts[key] = fn; };
+
+/* ---------------- بوابة الوضع الأفقي ---------------- */
+function initGate() {
+  const g = document.createElement('div'); g.id = 'gate';
+  g.innerHTML = '<div class="gate-in"><div class="gate-ico">📱↻</div><h2>أدر هاتفك للوضع الأفقي</h2><p>اللعبة مصممة للشاشة العرضية فقط</p><button class="btn gold" id="gateBtn">⛶ ملء الشاشة + قفل الوضع الأفقي</button></div>';
+  document.body.appendChild(g);
+  const lock = () => { try { const el = document.documentElement; const fr = (el.requestFullscreen || el.webkitRequestFullscreen || function () { return Promise.resolve(); }).call(el); if (fr && fr.catch) fr.catch(() => { }); } catch (e) { } try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } };
+  document.getElementById('gateBtn').onclick = lock;
+  const upd = () => { g.classList.toggle('on', window.innerHeight > window.innerWidth * 1.02); };
+  window.addEventListener('resize', upd); window.addEventListener('orientationchange', upd); upd();
+}
+
+/* ---------------- الدفيجنات ---------------- */
+// الترتيب من الأدنى إلى الأعلى: هاوي (5) ← محترف (4) ← عالمي (3) ← أسطوري (2) ← أيقوني (1)
+KL.DIVS = [
+  { id: 'amateur', ar: 'هاوي', en: 'AMATEUR', rank: 5, need: 15, diff: 0.35, col: '#7fd6a2', logo: 'https://i.ibb.co/679PTtgh/Picsart-26-10-28-18-17-26-436.webp' },
+  { id: 'pro', ar: 'محترف', en: 'PRO', rank: 4, need: 20, diff: 0.6, col: '#5aa9ff', logo: 'https://i.ibb.co/XrkFs6nH/Picsart-26-10-28-18-17-57-235.webp' },
+  { id: 'world', ar: 'عالمي', en: 'WORLD CLASS', rank: 3, need: 20, diff: 0.8, col: '#b57bff', logo: 'https://i.supaimg.com/9b836138-e901-4e3b-a57b-85af24b46cef/59d15c9c-4686-4959-95e5-a12dc9cdac40.jpg' },
+  { id: 'legend', ar: 'أسطوري', en: 'LEGENDARY', rank: 2, need: 20, diff: 0.95, col: '#ff9f3a', logo: 'https://i.ibb.co/7txWQyfp/Picsart-26-10-28-18-35-19-595.webp' },
+  { id: 'iconic', ar: 'أيقوني', en: 'ICONIC', rank: 1, need: 25, diff: 1.08, col: '#ffdf00', logo: 'https://i.ibb.co/KcbHvtMP/Picsart-26-10-28-18-35-55-284.webp' }
+];
+KL.divBadge = function (d, size) { // شعار بديل مولّد إن تعذّر تحميل الصورة
+  const c = document.createElement('canvas'); c.width = c.height = size || 128; const x = c.getContext('2d'), s = c.width;
+  x.fillStyle = d.col; x.beginPath(); x.moveTo(s * .5, s * .04); x.lineTo(s * .92, s * .22); x.lineTo(s * .82, s * .78); x.lineTo(s * .5, s * .96); x.lineTo(s * .18, s * .78); x.lineTo(s * .08, s * .22); x.closePath(); x.fill();
+  x.fillStyle = 'rgba(0,0,0,.35)'; x.beginPath(); x.arc(s * .5, s * .48, s * .26, 0, 7); x.fill();
+  x.fillStyle = '#fff'; x.font = '900 ' + (s * .3) + 'px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(d.rank), s * .5, s * .5);
+  return c.toDataURL();
+};
+const DIV_FILE = { amateur: 'be_button', pro: 'mh_button', world: 'wr_button', legend: 'le_button', iconic: 'ic_button' };
+KL.divErr = (im, id) => { const d = KL.DIVS.find(x => x.id === id); if (d && !im.dataset.f && im.src.indexOf('assets/') >= 0) { im.dataset.f = 1; im.src = d.logo; } else { im.onerror = null; im.src = KL.divBadge(d); } };
+const dimg = (d, cls) => '<img class="' + (cls || 'dv-logo') + '" src="assets/' + DIV_FILE[d.id] + '.png" alt="" onerror="KL.divErr(this,\'' + d.id + '\')">';
+let api = null, st = null;
+const load = () => { const s = api.store.get('kl_div', null); return s && s.tier >= 0 && s.tier < 5 ? s : { tier: 0, wins: 0, played: 0, lost: 0, team: null, done: false }; };
+const save = () => api.store.set('kl_div', st);
+
+function render() {
+  const E = KL.ui.screen('scrDiv'), cur = KL.DIVS[st.tier], pct = Math.min(100, Math.round(st.wins / cur.need * 100));
+  let list = KL.DIVS.map((d, i) => '<div class="dv-item ' + (i < st.tier || st.done ? 'done' : i === st.tier ? 'cur' : 'lock') + '" style="--c:' + d.col + '">' + dimg(d, 'dv-mini') + '<b>' + d.ar + '</b><small>' + d.need + ' فوز</small><em>' + (i < st.tier || st.done ? '✔' : i === st.tier ? '▶' : '🔒') + '</em></div>').join('');
+  E.innerHTML = '<div class="topbar"><button class="btn sm" id="dvBack">→ القائمة</button><h2>🏅 الدفيجنات</h2><span class="chip">' + st.played + ' مباراة</span></div>' +
+    '<div class="dv-hero" style="--c:' + cur.col + '">' + dimg(cur) + '<div class="dv-txt"><small>دفيجن ' + cur.rank + '</small><h1>' + cur.ar + '</h1><span>' + cur.en + '</span></div></div>' +
+    '<div class="dv-bar"><i style="width:' + pct + '%"></i><b>🏆 ' + st.wins + ' / ' + cur.need + '</b></div>' +
+    '<p class="small" style="text-align:center">اربح ' + cur.need + ' مباراة في هذا الدفيجن لتصعد للتالي — الخصوم أقوى كلما صعدت.</p>' +
+    '<div class="dv-actions"><button class="btn big gold" id="dvPlay">⚽ ' + (st.done ? 'العب مباراة (أيقوني)' : 'العب مباراة مصنّفة') + '</button><button class="btn" id="dvTeam">🔁 فريقي: ' + (st.team ? api.esc(api.nm(st.team)) : 'اختر') + '</button><button class="btn red" id="dvReset">إعادة الدفيجنات</button></div>' +
+    '<div class="dv-list">' + list + '</div>';
+  document.getElementById('dvBack').onclick = () => api.show('scrHome');
+  document.getElementById('dvPlay').onclick = play;
+  document.getElementById('dvTeam').onclick = pickMine;
+  document.getElementById('dvReset').onclick = () => api.dialog('إعادة الدفيجنات؟', 'سيعود تقدمك إلى دفيجن هاوي.', [{ t: 'نعم', cls: 'red', f: () => { st = { tier: 0, wins: 0, played: 0, lost: 0, team: st.team, done: false }; save(); render(); } }, { t: 'إلغاء' }]);
+}
+function pickMine(then) {
+  const all = KL.CLUBS.concat(KL.NATIONS);
+  api.pickTeam(all, 'اختر فريقك للدفيجنات', id => { st.team = id; save(); render(); api.show('scrDiv'); if (typeof then === 'function') then(); });
+}
+function opponent() {
+  const pool = KL.CLUBS.concat(KL.NATIONS).filter(t => t.id !== st.team).sort((a, b) => a.ovr - b.ovr);
+  const f = st.tier / 4, lo = Math.floor(f * (pool.length - 12)), band = pool.slice(lo, lo + 12);
+  return band[Math.floor(Math.random() * band.length)];
+}
+function play() {
+  if (!st.team) { pickMine(play); return; }
+  const cur = KL.DIVS[st.tier], opp = opponent(), prev = +api.S.cfg.diff;
+  api.S.cfg.diff = cur.diff; // الصعوبة حسب الدفيجن
+  api.startMatch(KL.ALL[st.team], opp, { onEnd: r => { api.S.cfg.diff = prev; result(r, opp, cur); }, onQuit: () => { api.S.cfg.diff = prev; render(); api.show('scrDiv'); } });
+}
+function result(r, opp, cur) {
+  st.played++; let msg, title;
+  if (r.winner === 0) { st.wins++; title = '🏆 فوز! (' + st.wins + '/' + cur.need + ')'; msg = 'ضد ' + api.nm(opp.id) + ' — ' + r.score.join(' - '); }
+  else { st.lost++; title = '😔 خسارة'; msg = 'ضد ' + api.nm(opp.id) + ' — ' + r.score.join(' - ') + ' (لا تُخصم انتصاراتك)'; }
+  let promo = null;
+  if (st.wins >= cur.need) { if (st.tier < 4) { st.tier++; st.wins = 0; promo = KL.DIVS[st.tier]; } else { st.done = true; st.wins = cur.need; promo = cur; } }
+  save(); render(); api.show('scrDiv');
+  if (promo) { const last = promo === cur; api.dialog(last ? '👑 أنت بطل الدفيجن الأيقوني!' : '⬆ ترقية إلى دفيجن ' + promo.ar + '!', last ? 'أنهيت كل الدفيجنات. يمكنك مواصلة اللعب للتحدي.' : 'مبروك! الخصوم الآن أقوى.', [{ t: 'متابعة', cls: 'gold' }]); }
+  else api.toast(title + ' — ' + msg, 3200);
+}
+KL.initModes = (function (prev) {
+  return function (a) {
+    api = a; initGate(); st = load();
+    KL.ui.addHome('🏅 الدفيجنات', 'هاوي ← محترف ← عالمي ← أسطوري ← أيقوني', 'purple', () => { st = load(); render(); api.show('scrDiv'); }, 'div');
+    if (prev) prev(a);
+  };
+})(KL.initModes);
+})();
+
+;
 /* ===== career.js ===== */
 /* ============================================================
    KING'S LEAGUE 3D — career.js
@@ -419,9 +516,9 @@ function initIntro() {
   $('inStart').onclick = () => {
     try { S.eng.sound.init(); } catch (e) { }
     $('introLogos').style.display = 'none'; $('introVid').classList.remove('hide');
-    v.src = A.video; v.onended = finish; v.onerror = finish;
+    v.src = A.video; v.onended = finish; v.onerror = () => { toast('الفيديو غير موجود/لم يُرفع (assets/video.mp4) — تخطي'); finish(); };
     const pr = v.play(); if (pr && pr.catch) pr.catch(() => { v.muted = true; const p2 = v.play(); if (p2 && p2.catch) p2.catch(finish); });
-    setTimeout(() => { if (!done && v.readyState < 2 && v.currentTime === 0) finish(); }, 15000);
+    setTimeout(() => { if (!done && v.readyState < 2 && v.currentTime === 0) { toast('تعذّر تشغيل الفيديو — تخطي'); finish(); } }, 8000);
   };
   $('inSkip').onclick = finish;
 }
@@ -436,13 +533,26 @@ fitScreen(); window.addEventListener('resize', fitScreen); window.addEventListen
 function init() {
   try { S.eng = new KL.Engine($('gl')); } catch (e) { $('bootMsg').textContent = 'جهازك لا يدعم WebGL: ' + e.message; return; }
   window.addEventListener('resize', () => { S.eng.resize(); checkRotate(); }); window.addEventListener('orientationchange', () => setTimeout(() => { S.eng.resize(); checkRotate(); }, 250));
-  const hl = $('homeLogo'); hl.src = KL.ASSETS.league; hl.onerror = () => { hl.onerror = () => hl.style.display = 'none'; hl.src = KL.LEAGUE_LOGO; }; if (0) hl.src = KL.LEAGUE_LOGO; 
+  
   KL.initLineup({ back: () => show(S.screen === 'hud' || S.screen === 'scrLineup' ? 'scrHome' : S.screen) });
   /* القائمة الرئيسية: 3 صفحات أفقية بأزرار صور من assets */
   $$('#hmTabs button').forEach(b => b.onclick = () => { snd('ui'); $$('#hmTabs button').forEach(x => x.classList.toggle('on', x === b)); $$('.hm-page').forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.p)); });
-  $$('.hb').forEach(btn => {
+  /* تُحمَّل صور كل صفحة عند فتحها فقط، وتُصغَّر إلى 640px لتخفيف الذاكرة (إن كانت الصور الأصلية ضخمة) */
+  const loadBtn = btn => {
+    if (btn.dataset.loaded) return; btn.dataset.loaded = 1;
     const names = btn.dataset.img.split(','), cand = []; names.forEach(n => ['png', 'webp', 'jpg'].forEach(e => cand.push('assets/' + n + '.' + e)));
-    let i = 0; const im = new Image(); im.alt = btn.textContent; im.onload = () => { btn.classList.add('hasimg'); btn.insertBefore(im, btn.firstChild); }; im.onerror = () => { if (i < cand.length) im.src = cand[i++]; }; im.src = cand[i++];
+    let i = 0; const im = new Image(); im.alt = btn.textContent;
+    im.onload = () => {
+      let el = im; const w = im.naturalWidth || 0;
+      if (w > 800) { try { const k = 640 / w, c = document.createElement('canvas'); c.width = 640; c.height = Math.round(im.naturalHeight * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); el = new Image(); el.alt = im.alt; el.src = c.toDataURL('image/webp', 0.88); } catch (e) { el = im; } }
+      btn.classList.add('hasimg'); btn.insertBefore(el, btn.firstChild);
+    };
+    im.onerror = () => { if (i < cand.length) im.src = cand[i++]; }; im.src = cand[i++];
+  };
+  const loadPage = p => $$('.hm-page[data-p="' + p + '"] .hb').forEach(loadBtn);
+  $$('#hmTabs button').forEach(b => { const f = b.onclick; b.onclick = () => { f(); loadPage(b.dataset.p); }; });
+  loadPage('0');
+  $$('.hb').forEach(btn => {
     btn.onclick = () => {
       try { S.eng.sound.init(); } catch (e) { } snd('ui'); const a = btn.dataset.act;
       if (a === 'mena' || a === 'nations') menuGo(a); else if (KL.ui && KL.ui.acts && KL.ui.acts[a]) KL.ui.acts[a](); else toast('هذا الوضع غير متاح');
@@ -479,3 +589,5 @@ window.KLApp = S;
 ;
 
 window.__KL_END = 1;
+
+

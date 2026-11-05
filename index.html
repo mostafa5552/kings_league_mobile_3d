@@ -21,12 +21,9 @@
 <div id="scrIntro" class="screen">
   <div id="introLogos" class="intro-in">
     <div class="intro-row">
-      <figure><img id="inLg1" alt="Kings League MENA"><figcaption>KINGS LEAGUE MENA</figcaption></figure>
-      <figure><img id="inLg2" alt="Kings League World Cup"><figcaption>KINGS LEAGUE WORLD CUP</figcaption></figure>
+      <img id="inLg1" alt="Kings League MENA"><img id="inLg2" alt="Kings League World Cup"><img id="inDev" alt="DESHA.245">
     </div>
-    <h1>KING'S LEAGUE <span>3D</span></h1>
-    <button class="btn big gold" id="inStart">▶ اضغط للبدء</button>
-    <div class="intro-dev"><img id="inDev" alt="DESHA.245"><span>تطوير · DESHA.245</span></div>
+    <button class="btn big gold" id="inStart">ادخل اللعبة ▶</button>
   </div>
   <div id="introVid" class="hide"><video id="inVideo" playsinline preload="metadata"></video><button class="btn sm" id="inSkip">تخطي ⏭</button></div>
 </div>
@@ -34,9 +31,10 @@
 <!-- ============ الشاشة الرئيسية ============ -->
 <div id="scrHome" class="screen">
   <div class="home2">
-    <header class="hm-top"><img class="hm-logo" id="homeLogo" alt=""><h1>KING'S LEAGUE <span>3D</span></h1>
-      <div class="hm-tools"><button class="ib" id="btnSettings" title="الإعدادات">⚙️</button><button class="ib" id="btnHow" title="طريقة اللعب">📖</button><button class="ib" id="btnFull" title="ملء الشاشة">⛶</button></div></header>
-    <nav class="hm-tabs" id="hmTabs"><button class="on" data-p="0">NORMAL TOURNAMENTS</button><button data-p="1">ONLINE MODS</button><button data-p="2">OTHER MODS</button></nav>
+    <div class="hm-bar">
+      <button class="pill" id="btnHow">Rules</button><button class="pill" id="btnSettings">Settings</button><button class="pill gold" data-go="friendly">Quick Match</button><button class="pill" id="btnFull">⛶</button>
+    </div>
+    <nav class="hm-tabs" id="hmTabs"><button class="on" data-p="0">NORMAL TOURNMENTS</button><button data-p="1">ONLINE MODS</button><button data-p="2">OTHER MODS</button></nav>
     <div class="hm-pages">
       <section class="hm-page on" data-p="0">
         <button class="hb" data-act="mena" data-img="klm_button,klm_botton"><span class="hb-fb">KINGS LEAGUE MENA</span></button>
@@ -44,15 +42,14 @@
       </section>
       <section class="hm-page" data-p="1">
         <button class="hb" data-act="olm" data-img="ol_button,ol_botton"><span class="hb-fb">ONLINE MATCH</span></button>
-        <button class="hb" data-act="ont" data-img="ont_button,ont_botton"><span class="hb-fb">ONLINE TOURNAMENT</span></button>
+        <button class="hb" data-act="ont" data-img="ont_button,ont_botton"><span class="hb-fb">ONLINE TOURNMENTS</span></button>
       </section>
       <section class="hm-page" data-p="2">
         <button class="hb" data-act="career" data-img="cm_button,cm_botton"><span class="hb-fb">CAREER MODE</span></button>
         <button class="hb" data-act="div" data-img="dm_button,dm_botton"><span class="hb-fb">DIVISIONS MODE</span></button>
       </section>
     </div>
-    <div class="hm-foot"><button class="btn" data-go="friendly">⚽ مباراة سريعة</button></div>
-  </div>
+      </div>
 </div>
 
 <!-- ============ اختيار الفريق ============ -->

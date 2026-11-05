@@ -82,13 +82,13 @@ class AI {
       const att = t.tact.style === 'att' ? 1.25 : (t.tact.style === 'def' ? 0.8 : 1);
       const lane = d2g < 24 ? this.laneOpen(P, gx) : false;
       // تسديد قريب
-      if (d2g < 13.5 && P.a.shoot > 0.3) {
-        let p = (0.3 + (13.5 - d2g) * 0.05) * att; if (!lane) p *= 0.35;
+      if (d2g < F.penD && P.a.shoot > 0.3) {
+        let p = (0.3 + (F.penD - d2g) * 0.05) * att; if (!lane) p *= 0.35;
         if (rr() < p) { const side = rr() < 0.58 ? -sgn(gk.z || (rr() < 0.5 ? 1 : -1)) : (rr() < 0.5 ? 1 : -1); this.doShoot(P, rnd(0.65, 1), side * rnd(0.6, 3.1)); return; }
       }
       // تسديد بعيد (13.5 – 22م) عند وجود خط مفتوح ومسدد جيد
-      else if (d2g >= 13.5 && d2g < 22 && lane && nd > 2.2 && P.a.shoot > 0.55) {
-        const p = 0.24 * att * (P.a.shoot - 0.3) * (1.3 - (d2g - 13.5) / 14);
+      else if (d2g >= F.penD && d2g < F.penD + 9 && lane && nd > 2.2 && P.a.shoot > 0.55) {
+        const p = 0.24 * att * (P.a.shoot - 0.3) * (1.3 - (d2g - F.penD) / 14);
         if (rr() < p) { this.doShoot(P, rnd(0.8, 1), (rr() < 0.5 ? -1 : 1) * rnd(1.2, 3.2)); return; }
       }
       // تمرير منظم: تحت الضغط، أو إذا وُجد زميل أفضل تمركزاً
@@ -190,9 +190,9 @@ class AI {
     ang += rnd(-err, err);
     const sp = 15 + 16 * power;
     b.owner = null; b.vx = Math.cos(ang) * sp; b.vz = Math.sin(ang) * sp; b.vy = rnd(0.4, 1.2) + power * rnd(0.5, 3.0); b.y = Math.max(b.y, F.R + 0.05);
-    b.shotSp = sp; b.cd = 0.12; b.shotT = 1.6; b.shotBy = P; b.lastTeam = P.t; b.last = P; P.noPick = 0.45; P.kickT = 0.35; P.fx = Math.cos(ang); P.fz = Math.sin(ang);
+    b.shotSp = sp; b.shotD = hyp(gx - P.x, P.z); b.cd = 0.12; b.shotT = 1.6; b.shotBy = P; b.lastTeam = P.t; b.last = P; P.noPick = 0.45; P.kickT = 0.35; P.fx = Math.cos(ang); P.fz = Math.sin(ang);
     { const oG = this.t[1 - P.t].gk; if (oG) oG.shotKz = oG.z; }
-    this.stats[P.t].shots++; if (hyp(gx - P.x, P.z) > 13.5) this.stats[P.t].long = (this.stats[P.t].long || 0) + 1; this.emit('kick', { P, power, shot: true });
+    this.stats[P.t].shots++; if (hyp(gx - P.x, P.z) > F.penD) this.stats[P.t].long = (this.stats[P.t].long || 0) + 1; this.emit('kick', { P, power, shot: true });
     if (this.sp && this.sp.kind === 'shootout') { this.sp.kicked = true; this.sp.kt = 0; }
   }
   tryPickup() {
@@ -217,13 +217,13 @@ class AI {
     // مدى صعوبة الكرة: بُعد نقطة الدخول عن الحارس (بعد خصم مدى وصوله)، السرعة، الارتفاع
     const kz = G.shotKz != null && b.shotBy && b.shotBy.t !== G.t ? G.shotKz : G.z;
     const miss = Math.max(0, Math.abs(zc - kz) - 1.25 - skill * 0.7);
-    const ssp = b.shotBy && b.shotSp ? b.shotSp : sp + 4;
-    let p = 0.98 - miss * 0.5;
-    p *= clamp(1.45 - (ssp - 14) * 0.055, 0.45, 1.1);
-    if (b.y > 1.7) p *= 0.78; if (Math.abs(zc) > F.gw - 0.7) p *= 0.8;
-    p *= 0.8 + 0.3 * skill;
-    p *= this.hu(G.t) ? 2.6 : (b.shotBy && !this.hu(b.shotBy.t) ? 1.6 : (0.92 + 0.15 * this.diff));
-    p = clamp(p, 0.06, 0.95); if (KL.dbgSave) KL.dbgSave.push({ p, miss, ssp, y: b.y, zc });
+    const ssp = b.shotBy && b.shotSp ? b.shotSp : sp + 4, inside = (b.shotD == null ? 10 : b.shotD) <= F.penD;
+    // الواقعية: الكرة القريبة من الحارس تدخل ~30%، من داخل المنطقة بعيداً عنه معظمها يدخل، ومن خارج المنطقة ~50%
+    let p = inside ? clamp(0.7 - miss * 0.36, 0.22, 0.7) : clamp(0.55 - miss * 0.2, 0.35, 0.55);
+    p *= clamp(1.2 - (ssp - 18) * 0.02, 0.8, 1.15) * (0.92 + 0.14 * skill);
+    if (b.y > 1.7) p *= 0.85;
+    p *= this.hu(G.t) ? 1.1 : 1;
+    p = clamp(p, 0.1, 0.8); if (KL.dbgSave) KL.dbgSave.push({ p, miss, ssp, y: b.y, zc, inside });
     if (this.sp && this.sp.kind === 'penalty') p *= 0.55; else if (this.sp && this.sp.kind === 'shootout') p *= 0.8;
     if (rr() < p) {
       if (sp < 13.5 || rr() < 0.35) { this.takeBall(G); b.y = 1.1; this.emit('save', { G, hold: true }); }
@@ -313,7 +313,7 @@ class Tournament {
       if (!stages.includes(m.stage) || !T[m.a] || !T[m.b]) continue;
       const A = T[m.a], B = T[m.b]; A.p++; B.p++; A.gf += m.sa; A.ga += m.sb; B.gf += m.sb; B.ga += m.sa;
       const viaPso = m.pso && m.sa === m.sb;
-      if (m.w === m.a) { A.w++; B.l++; A.pts += viaPso ? 2 : 3; B.pts += viaPso ? 1 : 0; } else { B.w++; A.l++; B.pts += viaPso ? 2 : 3; A.pts += viaPso ? 1 : 0; }
+      if (m.w === m.a) { A.w++; B.l++; A.pts += 3; } else { B.w++; A.l++; B.pts += 3; }
     }
     const arr = Object.values(T); arr.forEach(r => r.gd = r.gf - r.ga);
     arr.sort((x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || y.rnd - x.rnd); return arr;
@@ -489,3 +489,5 @@ KL.initLineup = function (hooks) {
 })();
 
 ;
+
+

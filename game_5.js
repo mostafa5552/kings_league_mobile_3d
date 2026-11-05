@@ -177,7 +177,10 @@ const AR_ERR = [
   [/Password should be at least/i, 'كلمة المرور قصيرة (6 أحرف على الأقل)'],
   [/Unable to validate email|invalid format|valid email/i, 'البريد الإلكتروني غير صالح'],
   [/Email not confirmed/i, 'أكّد بريدك الإلكتروني من الرسالة التي وصلتك ثم سجّل الدخول'],
+  [/email rate limit|over_email_send_rate_limit/i, 'سوبابيس منع إرسال رسائل تأكيد كثيرة. الحل: ادخل Supabase ← Authentication ← Providers ← Email وأطفئ Confirm email، أو استخدم زر Google/ضيف'],
   [/rate limit|too many/i, 'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة'],
+  [/provider is not enabled|Unsupported provider/i, 'تسجيل Google غير مفعّل في Supabase بعد — اتبع الشرح'],
+  [/anonymous.*disabled|Anonymous sign-ins are disabled/i, 'دخول الضيف غير مفعّل في Supabase (Authentication ← Sign In / Providers ← Allow anonymous sign-ins)'],
   [/Failed to fetch|NetworkError|network/i, 'تعذّر الاتصال بالإنترنت'],
   [/profiles_username_ci|duplicate key.*username/i, 'اسم المستخدم مستخدم من قبل'],
   [/row-level security/i, 'غير مسموح بهذه العملية']
@@ -198,6 +201,8 @@ class OnlineDB {
     return { needsConfirm: !data.session, user: data.user };
   }
   async signIn(email, password) { const { data, error } = await this.sb.auth.signInWithPassword({ email: String(email).trim(), password }); if (error) fail(error); this.me = data.user; this.profile = null; return data.user; }
+  async signInGoogle() { const { error } = await this.sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } }); if (error) fail(error); }
+  async signInGuest() { const { data, error } = await this.sb.auth.signInAnonymously(); if (error) fail(error); this.me = data.user; this.profile = null; return data.user; }
   async signOut() { await this.sb.auth.signOut(); this.me = null; this.profile = null; }
   /* ---- الملف الشخصي ---- */
   static validUsername(u) { return /^[\p{L}\p{N}_]{3,16}$/u.test(u); }
@@ -321,7 +326,11 @@ function authScreen(mode) {
   view(back() + '<div class="ol-box"><div class="cr-pos" id="auTabs"><button data-m="in" class="' + (mode === 'in' ? 'on' : '') + '">تسجيل الدخول</button><button data-m="up" class="' + (mode === 'up' ? 'on' : '') + '">حساب جديد</button></div>' +
     '<label>البريد الإلكتروني<input id="auMail" type="email" autocomplete="email" dir="ltr" placeholder="name@example.com"></label>' +
     '<label>كلمة المرور<input id="auPass" type="password" autocomplete="' + (mode === 'in' ? 'current-password' : 'new-password') + '" dir="ltr" placeholder="6 أحرف على الأقل"></label>' +
-    '<button class="btn big gold" id="auGo">' + (mode === 'in' ? 'دخول' : 'إنشاء الحساب') + '</button><p class="small" id="auMsg"></p></div>');
+    '<button class="btn big gold" id="auGo">' + (mode === 'in' ? 'دخول' : 'إنشاء الحساب') + '</button>' +
+    '<div class="au-or">— أو —</div><div class="au-alt"><button class="btn" id="auGoogle">🔵 الدخول بـ Google</button><button class="btn" id="auGuest">👤 دخول كضيف</button></div><p class="small" id="auMsg"></p></div>');
+  const alt = (id, fn) => { $(id).onclick = async () => { try { api.busy(true, 'لحظة…'); await TMO(fn(), 25000); api.busy(false); openOnline(hubKind); } catch (e) { api.busy(false); $('auMsg').textContent = '⚠ ' + e.message; } }; };
+  alt('auGuest', () => db.signInGuest());
+  $('auGoogle').onclick = async () => { try { api.busy(true, 'جاري التحويل إلى Google…'); await TMO(db.signInGoogle(), 20000); } catch (e) { api.busy(false); $('auMsg').textContent = '⚠ ' + e.message; } };
   title('🌐 أونلاين'); bindBack(() => api.show('scrHome'));
   document.querySelectorAll('#auTabs button').forEach(b => b.onclick = () => authScreen(b.dataset.m));
   $('auGo').onclick = async () => {
@@ -581,100 +590,5 @@ KL._online = { get db() { return db; }, playRoom, renderTour };
 })();
 
 ;
-/* ===== divisions.js ===== */
-/* ============================================================
-   KING'S LEAGUE 3D — divisions.js
-   بوابة الوضع الأفقي + نظام الدفيجنات الخمسة (مباريات مصنّفة)
-   ============================================================ */
-var KL = window.KL = window.KL || {};
-(function () {
-'use strict';
-KL.ui = KL.ui || {};
-/* إنشاء شاشة ديناميكية */
-KL.ui.screen = function (id, html) { let e = document.getElementById(id); if (!e) { e = document.createElement('div'); e.id = id; e.className = 'screen'; document.body.appendChild(e); } if (html != null) e.innerHTML = html; return e; };
-KL.ui.acts = KL.ui.acts || {};
-KL.ui.addHome = function (label, sub, cls, fn, key) { if (key) KL.ui.acts[key] = fn; };
 
-/* ---------------- بوابة الوضع الأفقي ---------------- */
-function initGate() {
-  const g = document.createElement('div'); g.id = 'gate';
-  g.innerHTML = '<div class="gate-in"><div class="gate-ico">📱↻</div><h2>أدر هاتفك للوضع الأفقي</h2><p>اللعبة مصممة للشاشة العرضية فقط</p><button class="btn gold" id="gateBtn">⛶ ملء الشاشة + قفل الوضع الأفقي</button></div>';
-  document.body.appendChild(g);
-  const lock = () => { try { const el = document.documentElement; const fr = (el.requestFullscreen || el.webkitRequestFullscreen || function () { return Promise.resolve(); }).call(el); if (fr && fr.catch) fr.catch(() => { }); } catch (e) { } try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } };
-  document.getElementById('gateBtn').onclick = lock;
-  const upd = () => { g.classList.toggle('on', window.innerHeight > window.innerWidth * 1.02); };
-  window.addEventListener('resize', upd); window.addEventListener('orientationchange', upd); upd();
-}
 
-/* ---------------- الدفيجنات ---------------- */
-// الترتيب من الأدنى إلى الأعلى: هاوي (5) ← محترف (4) ← عالمي (3) ← أسطوري (2) ← أيقوني (1)
-KL.DIVS = [
-  { id: 'amateur', ar: 'هاوي', en: 'AMATEUR', rank: 5, need: 15, diff: 0.35, col: '#7fd6a2', logo: 'https://i.ibb.co/679PTtgh/Picsart-26-10-28-18-17-26-436.webp' },
-  { id: 'pro', ar: 'محترف', en: 'PRO', rank: 4, need: 20, diff: 0.6, col: '#5aa9ff', logo: 'https://i.ibb.co/XrkFs6nH/Picsart-26-10-28-18-17-57-235.webp' },
-  { id: 'world', ar: 'عالمي', en: 'WORLD CLASS', rank: 3, need: 20, diff: 0.8, col: '#b57bff', logo: 'https://i.supaimg.com/9b836138-e901-4e3b-a57b-85af24b46cef/59d15c9c-4686-4959-95e5-a12dc9cdac40.jpg' },
-  { id: 'legend', ar: 'أسطوري', en: 'LEGENDARY', rank: 2, need: 20, diff: 0.95, col: '#ff9f3a', logo: 'https://i.ibb.co/7txWQyfp/Picsart-26-10-28-18-35-19-595.webp' },
-  { id: 'iconic', ar: 'أيقوني', en: 'ICONIC', rank: 1, need: 25, diff: 1.08, col: '#ffdf00', logo: 'https://i.ibb.co/KcbHvtMP/Picsart-26-10-28-18-35-55-284.webp' }
-];
-KL.divBadge = function (d, size) { // شعار بديل مولّد إن تعذّر تحميل الصورة
-  const c = document.createElement('canvas'); c.width = c.height = size || 128; const x = c.getContext('2d'), s = c.width;
-  x.fillStyle = d.col; x.beginPath(); x.moveTo(s * .5, s * .04); x.lineTo(s * .92, s * .22); x.lineTo(s * .82, s * .78); x.lineTo(s * .5, s * .96); x.lineTo(s * .18, s * .78); x.lineTo(s * .08, s * .22); x.closePath(); x.fill();
-  x.fillStyle = 'rgba(0,0,0,.35)'; x.beginPath(); x.arc(s * .5, s * .48, s * .26, 0, 7); x.fill();
-  x.fillStyle = '#fff'; x.font = '900 ' + (s * .3) + 'px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(d.rank), s * .5, s * .5);
-  return c.toDataURL();
-};
-const DIV_FILE = { amateur: 'be_button', pro: 'mh_button', world: 'wr_button', legend: 'le_button', iconic: 'ic_button' };
-KL.divErr = (im, id) => { const d = KL.DIVS.find(x => x.id === id); if (d && !im.dataset.f && im.src.indexOf('assets/') >= 0) { im.dataset.f = 1; im.src = d.logo; } else { im.onerror = null; im.src = KL.divBadge(d); } };
-const dimg = (d, cls) => '<img class="' + (cls || 'dv-logo') + '" src="assets/' + DIV_FILE[d.id] + '.png" alt="" onerror="KL.divErr(this,\'' + d.id + '\')">';
-let api = null, st = null;
-const load = () => { const s = api.store.get('kl_div', null); return s && s.tier >= 0 && s.tier < 5 ? s : { tier: 0, wins: 0, played: 0, lost: 0, team: null, done: false }; };
-const save = () => api.store.set('kl_div', st);
-
-function render() {
-  const E = KL.ui.screen('scrDiv'), cur = KL.DIVS[st.tier], pct = Math.min(100, Math.round(st.wins / cur.need * 100));
-  let list = KL.DIVS.map((d, i) => '<div class="dv-item ' + (i < st.tier || st.done ? 'done' : i === st.tier ? 'cur' : 'lock') + '" style="--c:' + d.col + '">' + dimg(d, 'dv-mini') + '<b>' + d.ar + '</b><small>' + d.need + ' فوز</small><em>' + (i < st.tier || st.done ? '✔' : i === st.tier ? '▶' : '🔒') + '</em></div>').join('');
-  E.innerHTML = '<div class="topbar"><button class="btn sm" id="dvBack">→ القائمة</button><h2>🏅 الدفيجنات</h2><span class="chip">' + st.played + ' مباراة</span></div>' +
-    '<div class="dv-hero" style="--c:' + cur.col + '">' + dimg(cur) + '<div class="dv-txt"><small>دفيجن ' + cur.rank + '</small><h1>' + cur.ar + '</h1><span>' + cur.en + '</span></div></div>' +
-    '<div class="dv-bar"><i style="width:' + pct + '%"></i><b>🏆 ' + st.wins + ' / ' + cur.need + '</b></div>' +
-    '<p class="small" style="text-align:center">اربح ' + cur.need + ' مباراة في هذا الدفيجن لتصعد للتالي — الخصوم أقوى كلما صعدت.</p>' +
-    '<div class="dv-actions"><button class="btn big gold" id="dvPlay">⚽ ' + (st.done ? 'العب مباراة (أيقوني)' : 'العب مباراة مصنّفة') + '</button><button class="btn" id="dvTeam">🔁 فريقي: ' + (st.team ? api.esc(api.nm(st.team)) : 'اختر') + '</button><button class="btn red" id="dvReset">إعادة الدفيجنات</button></div>' +
-    '<div class="dv-list">' + list + '</div>';
-  document.getElementById('dvBack').onclick = () => api.show('scrHome');
-  document.getElementById('dvPlay').onclick = play;
-  document.getElementById('dvTeam').onclick = pickMine;
-  document.getElementById('dvReset').onclick = () => api.dialog('إعادة الدفيجنات؟', 'سيعود تقدمك إلى دفيجن هاوي.', [{ t: 'نعم', cls: 'red', f: () => { st = { tier: 0, wins: 0, played: 0, lost: 0, team: st.team, done: false }; save(); render(); } }, { t: 'إلغاء' }]);
-}
-function pickMine(then) {
-  const all = KL.CLUBS.concat(KL.NATIONS);
-  api.pickTeam(all, 'اختر فريقك للدفيجنات', id => { st.team = id; save(); render(); api.show('scrDiv'); if (typeof then === 'function') then(); });
-}
-function opponent() {
-  const pool = KL.CLUBS.concat(KL.NATIONS).filter(t => t.id !== st.team).sort((a, b) => a.ovr - b.ovr);
-  const f = st.tier / 4, lo = Math.floor(f * (pool.length - 12)), band = pool.slice(lo, lo + 12);
-  return band[Math.floor(Math.random() * band.length)];
-}
-function play() {
-  if (!st.team) { pickMine(play); return; }
-  const cur = KL.DIVS[st.tier], opp = opponent(), prev = +api.S.cfg.diff;
-  api.S.cfg.diff = cur.diff; // الصعوبة حسب الدفيجن
-  api.startMatch(KL.ALL[st.team], opp, { onEnd: r => { api.S.cfg.diff = prev; result(r, opp, cur); }, onQuit: () => { api.S.cfg.diff = prev; render(); api.show('scrDiv'); } });
-}
-function result(r, opp, cur) {
-  st.played++; let msg, title;
-  if (r.winner === 0) { st.wins++; title = '🏆 فوز! (' + st.wins + '/' + cur.need + ')'; msg = 'ضد ' + api.nm(opp.id) + ' — ' + r.score.join(' - '); }
-  else { st.lost++; title = '😔 خسارة'; msg = 'ضد ' + api.nm(opp.id) + ' — ' + r.score.join(' - ') + ' (لا تُخصم انتصاراتك)'; }
-  let promo = null;
-  if (st.wins >= cur.need) { if (st.tier < 4) { st.tier++; st.wins = 0; promo = KL.DIVS[st.tier]; } else { st.done = true; st.wins = cur.need; promo = cur; } }
-  save(); render(); api.show('scrDiv');
-  if (promo) { const last = promo === cur; api.dialog(last ? '👑 أنت بطل الدفيجن الأيقوني!' : '⬆ ترقية إلى دفيجن ' + promo.ar + '!', last ? 'أنهيت كل الدفيجنات. يمكنك مواصلة اللعب للتحدي.' : 'مبروك! الخصوم الآن أقوى.', [{ t: 'متابعة', cls: 'gold' }]); }
-  else api.toast(title + ' — ' + msg, 3200);
-}
-KL.initModes = (function (prev) {
-  return function (a) {
-    api = a; initGate(); st = load();
-    KL.ui.addHome('🏅 الدفيجنات', 'هاوي ← محترف ← عالمي ← أسطوري ← أيقوني', 'purple', () => { st = load(); render(); api.show('scrDiv'); }, 'div');
-    if (prev) prev(a);
-  };
-})(KL.initModes);
-})();
-
-;
