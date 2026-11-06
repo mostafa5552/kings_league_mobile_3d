@@ -331,7 +331,7 @@ button{font-family:inherit;color:#fff;border:0;cursor:pointer}
 @media (orientation:portrait){.hb{width:min(62vw,40vh)}#introVid video{width:86vw;max-height:40vh}}
 
 /* ===== v3: واجهة لعبة (PES) — بدون سكرول، خلفية نيون ===== */
-.screen{overflow:hidden}
+.screen{overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 #scrIntro,#scrHome{background:radial-gradient(ellipse at 50% 0%,#1250ff 0%,#0a1a6e 38%,#02040f 85%);overflow:hidden;touch-action:none}
 #scrIntro{align-items:center;justify-content:center}
 #scrIntro.show{display:flex}
@@ -355,4 +355,12 @@ button{font-family:inherit;color:#fff;border:0;cursor:pointer}
 @media (orientation:portrait){.hb{width:min(44%,40vh)}}
 .au-or{text-align:center;opacity:.7;font-size:12px;margin:6px 0}.au-alt{display:flex;gap:8px;justify-content:center}.au-alt .btn{flex:1}
 
-
+/* ===== v3: جويستك ثابت + أزرار يمين أكبر ومتباعدة ===== */
+#stickBase{width:150px;height:150px;left:calc(40px + var(--sa-l));bottom:calc(30px + var(--sa-b));opacity:.85}
+#stickKnob{width:70px;height:70px;margin:-35px 0 0 -35px}
+#pad{width:270px;height:250px}
+.act{font-size:15px}
+.act.a{right:12px;bottom:12px;width:112px;height:112px;font-size:19px}
+.act.b{right:150px;bottom:18px;width:90px;height:90px}
+.act.c{right:128px;bottom:142px;width:86px;height:86px}
+.act.d{right:16px;bottom:150px;width:86px;height:86px}

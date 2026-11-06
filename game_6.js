@@ -227,7 +227,20 @@ function setLogo(el, t) {
   im.onload = () => { el.style.backgroundImage = 'url(' + im.src + ')'; }; const ch = KL.logoChain(t); let ci = 0; const nx = () => { if (ci >= ch.length) { el.style.backgroundImage = 'url(' + KL.logoFallback(t.id) + ')'; return; } im.src = ch[ci++]; }; im.onerror = nx; nx();
 }
 const nm = id => KL.ALL[id].type === 'nation' ? KL.ALL[id].ar : KL.ALL[id].name;
-function show(id) { document.querySelectorAll('.screen').forEach(s => { if (s.id !== 'boot') s.classList.toggle('show', s.id === id); }); $('hud').classList.toggle('hide', id !== 'hud'); S.screen = id; checkRotate(); }
+/* ---- الموسيقى: 6 أغاني assets/music_1.mp3 .. music_6.mp3 تتوالى تلقائياً ---- */
+const MUS = { n: 6, i: 0, on: store.get('kl_music', 1) !== 0, a: null, fail: 0 };
+function musicVol() { return S.screen === 'hud' ? 0.18 : 0.5; }
+function musicLoad() {
+  if (!MUS.a) { const au = MUS.a = new Audio(); au.preload = 'auto'; au.onended = musicNext; au.onplaying = () => { MUS.fail = 0; }; au.onerror = () => { if (++MUS.fail < MUS.n) musicNext(); }; }
+  MUS.a.src = 'assets/music_' + (MUS.i + 1) + '.mp3'; MUS.a.volume = musicVol();
+}
+function musicPlay() { if (!MUS.a) musicLoad(); const p = MUS.a.play(); if (p && p.catch) p.catch(() => { }); }
+function musicNext() { MUS.i = (MUS.i + 1) % MUS.n; musicLoad(); if (MUS.on) musicPlay(); }
+function musicBtn() { document.querySelectorAll('.musicBtn').forEach(b => { b.textContent = MUS.on ? '🎵 إيقاف' : '🔇 تشغيل'; }); }
+function musicToggle() { MUS.on = !MUS.on; store.set('kl_music', MUS.on ? 1 : 0); if (MUS.on) musicPlay(); else if (MUS.a) MUS.a.pause(); musicBtn(); }
+function musicStart() { if (MUS.on) musicPlay(); musicBtn(); }
+document.addEventListener('visibilitychange', () => { if (!MUS.a) return; if (document.hidden) MUS.a.pause(); else if (MUS.on) musicPlay(); });
+function show(id) { document.querySelectorAll('.screen').forEach(s => { if (s.id !== 'boot') s.classList.toggle('show', s.id === id); }); $('hud').classList.toggle('hide', id !== 'hud'); S.screen = id; if (MUS.a) MUS.a.volume = musicVol(); checkRotate(); }
 function checkRotate() { $('rotate').classList.toggle('hide', !(S.screen === 'hud' && window.innerHeight > window.innerWidth * 1.05)); }
 function overlay(id, on) { $(id).classList.toggle('hide', !on); }
 function snd(n) { if (S.eng) S.eng.sound.play(n); }
@@ -448,14 +461,17 @@ function bindBtn(id, key) {
 }
 const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 }, kb = { l: 0, r: 0, u: 0, d: 0 };
 function bindStick() {
-  const z = $('stickZone'), base = $('stickBase'), knob = $('stickKnob'), R = 56;
-  const upd = (cx, cy) => { let dx = cx - stick.ox, dy = cy - stick.oy; const d = Math.hypot(dx, dy); if (d > R) { dx = dx / d * R; dy = dy / d * R; } stick.x = dx / R; stick.y = dy / R; knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; };
+  /* جويستك ثابت: القاعدة لا تتحرك، ومركز الحركة هو مركزها دائماً */
+  const z = $('stickZone'), base = $('stickBase'), knob = $('stickKnob');
+  let cx = 0, cy = 0, R = 56, sc = 1;
+  const measure = () => { const r = base.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; sc = r.width / (base.offsetWidth || r.width || 1); R = Math.max(30, r.width * 0.4); };
+  const upd = (px, py) => { let dx = px - cx, dy = py - cy; const d = Math.hypot(dx, dy); if (d > R) { dx = dx / d * R; dy = dy / d * R; } stick.x = dx / R; stick.y = dy / R; knob.style.transform = 'translate(' + (dx / sc) + 'px,' + (dy / sc) + 'px)'; };
   z.addEventListener('pointerdown', e => {
     if (stick.id !== null) return; e.preventDefault(); stick.id = e.pointerId; try { z.setPointerCapture(e.pointerId); } catch (x) { }
-    stick.ox = e.clientX; stick.oy = e.clientY; base.style.left = (e.clientX - 66) + 'px'; base.style.top = (e.clientY - 66) + 'px'; base.style.bottom = 'auto'; base.classList.add('act'); upd(e.clientX, e.clientY); S.eng.sound.init();
+    measure(); base.classList.add('act'); upd(e.clientX, e.clientY); S.eng.sound.init();
   });
   z.addEventListener('pointermove', e => { if (e.pointerId === stick.id) { e.preventDefault(); upd(e.clientX, e.clientY); } });
-  const end = e => { if (e.pointerId !== stick.id) return; stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; base.style.left = base.style.top = base.style.bottom = ''; base.classList.remove('act'); };
+  const end = e => { if (e.pointerId !== stick.id) return; stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; base.classList.remove('act'); };
   ['pointerup', 'pointercancel'].forEach(ev => z.addEventListener(ev, end));
 }
 const KEYS = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd' }, KACT = { Space: 'A', KeyJ: 'A', KeyK: 'B', KeyL: 'C', KeyE: 'C', ShiftLeft: 'D', ShiftRight: 'D' };
@@ -511,7 +527,7 @@ function initIntro() {
   l2.src = A.nations; l2.onerror = () => { l2.onerror = () => { l2.style.visibility = 'hidden'; }; l2.src = KL.NATIONS_LOGO; };
   dv.src = A.dev; hide(dv);
   let done = false; const v = $('inVideo');
-  const finish = () => { if (done) return; done = true; try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { } $('introVid').classList.add('hide'); show('scrHome'); };
+  const finish = () => { if (done) return; done = true; try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { } $('introVid').classList.add('hide'); show('scrHome'); musicStart(); };
   show('scrIntro');
   $('inStart').onclick = () => {
     try { S.eng.sound.init(); } catch (e) { }
@@ -562,6 +578,7 @@ function init() {
   $$('[data-back]').forEach(b => b.onclick = () => { snd('ui'); show('scrHome'); });
   $('hubBack').onclick = () => { snd('ui'); if (S.tour && S.tour.career && KL.careerOpen) KL.careerOpen(); else show('scrHome'); };
   $$('#hubTabs button').forEach(b => b.onclick = () => { hubTab = b.dataset.tab; snd('ui'); renderHub(); });
+  document.querySelectorAll('.musicBtn').forEach(b => b.onclick = () => { snd('ui'); musicToggle(); }); if ($('btnNext')) $('btnNext').onclick = () => { snd('ui'); MUS.on = true; store.set('kl_music', 1); musicNext(); musicBtn(); }; musicBtn();
   $('btnSettings').onclick = () => { applyCfg(); overlay('settingsBox', true); }; $('setClose').onclick = () => { saveCfg(); overlay('settingsBox', false); };
   $('btnHow').onclick = () => { $('howTxt').innerHTML = HOW; overlay('howBox', true); }; $('howClose').onclick = () => overlay('howBox', false);
   $('btnFull').onclick = () => { try { const d = document.documentElement; const fr = (d.requestFullscreen || d.webkitRequestFullscreen || function () { return Promise.resolve(); }).call(d); if (fr && fr.catch) fr.catch(() => { }); else if (!document.fullscreenEnabled && !document.webkitFullscreenEnabled) toast('ملء الشاشة غير مدعوم هنا — افتح اللعبة في متصفح Chrome'); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } };
@@ -589,5 +606,3 @@ window.KLApp = S;
 ;
 
 window.__KL_END = 1;
-
-
